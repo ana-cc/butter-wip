@@ -1,0 +1,52 @@
+---
+- name: Deploy butter site
+  hosts: all
+  become: true
+  vars:
+    butter_language: en  # override this with --extra-vars
+
+  tasks:
+    - name: Ensure /etc/resolv.conf contains nameserver 1.1.1.1
+      copy:
+        dest: /etc/resolv.conf
+        content: "nameserver 1.1.1.1\n"
+        owner: root
+        group: root
+        mode: '0644'
+
+    - name: Ensure /tmp/butter-site is absent
+      file:
+        path: /tmp/butter-site
+        state: absent
+
+    - name: Ensure /tmp/site.zip is absent
+      file:
+        path: /tmp/site.zip
+        state: absent
+
+    - name: Download the butter-box UI zip file
+      get_url:
+        url: "https://likebutter.gitlab.io/butter-box-ui/site-{{ butter_language }}.zip"
+        dest: /tmp/site.zip
+        mode: '0644'
+
+    - name: Ensure /tmp/butter-site directory exists
+      file:
+        path: /tmp/butter-site
+        state: directory
+        mode: '0755'
+
+    - name: Unarchive site.zip to /tmp/butter-site
+      unarchive:
+        src: /tmp/site.zip
+        dest: /tmp/butter-site
+        remote_src: yes
+
+    - name: Copy contents to /var/www/html/
+      copy:
+        src: /tmp/butter-site/
+        dest: /var/www/html/
+        owner: www-data
+        group: www-data
+        mode: '0755'
+        remote_src: yes
