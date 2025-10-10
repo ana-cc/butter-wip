@@ -1,0 +1,4 @@
+ansible_host: 188.40.241.21
+ansible_user: root
+is_vmdb2: "false"
+butter_user: "butter"

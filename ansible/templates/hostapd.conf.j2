@@ -1,0 +1,16 @@
+driver=nl80211
+ctrl_interface=/var/run/hostapd
+ctrl_interface_group=0
+auth_algs=1
+wpa_key_mgmt=WPA-PSK
+beacon_int=100
+ssid={{ butter_name }}
+channel=1
+hw_mode=g
+ieee80211n=0
+interface=wlan0
+wpa=none
+wpa_pairwise=CCMP
+wpa_passphrase=ThisIsInertAndSatisfiesValidation
+country_code=US
+ignore_broadcast_ssid=0

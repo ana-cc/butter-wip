@@ -2,10 +2,15 @@
 - name: Deploy butter site
   hosts: all
   become: true
-  vars:
-    butter_language: en  # override this with --extra-vars
 
   tasks:
+    - name: Install unzip
+      apt:
+        name:
+          - unzip
+        state: present
+        update_cache: yes
+
     - name: Ensure /etc/resolv.conf contains nameserver 1.1.1.1
       copy:
         dest: /etc/resolv.conf
@@ -13,6 +18,7 @@
         owner: root
         group: root
         mode: '0644'
+      when: is_vmdb2 | bool
 
     - name: Ensure /tmp/butter-site is absent
       file:

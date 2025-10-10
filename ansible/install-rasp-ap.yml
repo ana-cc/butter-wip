@@ -1,0 +1,116 @@
+---
+- name: Install chat
+  hosts: all
+  become: true
+  vars:
+    raspap_branch: "3.4.3"
+    raspap_wireguard: 0
+    raspap_openvpn: 0
+    raspap_adblock: 0
+
+  tasks:
+    - name: Install deps
+      apt:
+        name:
+          - locales-all
+          - dhcpcd
+          - wget
+          - iw
+        state: present
+        update_cache: yes
+
+    - name: Check if RaspAP is already installed
+      ansible.builtin.stat:
+        path: /var/www/html/admin
+      register: raspap_stat
+
+    - name: Download RaspAP install script
+      ansible.builtin.get_url:
+        url: https://install.raspap.com
+        dest: /tmp/raspap_install.sh
+        mode: "0755"
+      when: not raspap_stat.stat.exists
+
+    - name: Run RaspAP install script
+      ansible.builtin.shell: |
+        bash /tmp/raspap_install.sh --yes --path /var/www/html/admin \
+        --wireguard {{ raspap_wireguard }} \
+        --openvpn {{ raspap_openvpn }} \
+        --adblock {{ raspap_adblock }} \
+        --branch {{ raspap_branch }}
+      when: not raspap_stat.stat.exists
+      register: raspap_install
+      changed_when: raspap_install.rc == 0
+      failed_when: raspap_install.rc != 0
+
+    - name: Remove /var/www/html.* directories if they exist
+      become: true
+      ansible.builtin.shell: |
+        find /var/www/html.* -maxdepth 0 -type d -exec rm -r {} \; || :
+      changed_when: false
+
+    - name: Ensure /etc/hostapd directory exists
+      file:
+        path: /etc/hostapd
+        state: directory
+        mode: '0755'
+
+    - name: Template RaspAP network config to target
+      template:
+        src: "hostapd.conf.j2"
+        dest: "/etc/hostapd/hostapd.conf"
+        mode: '0644'
+
+    - name: Copy hostapd set_hostapd_iface config script
+      template:
+        src: "set_hostapd_iface.py"
+        dest: "/usr/local/bin/set_hostapd_iface.py"
+        mode: '0755'
+
+    - name: Copy hostapd set_hostapd_iface service file
+      template:
+        src: "set-hostapd-iface.service.j2"
+        dest: "/lib/systemd/system/set-hostapd-iface.service"
+        mode: '0755'
+
+    - name: Download hostapd raspapd systemd service file
+      get_url:
+        url: "{{ config_base_url }}/raspapd.service"
+        dest: "/lib/systemd/system/raspapd.service"
+        owner: root
+        group: root
+        mode: '0644'
+
+
+    - name: Enable service raspapd and set_hostapd_iface by symlink
+      file:
+        src: "/lib/systemd/system/{{ item }}"
+        dest: "/etc/systemd/system/multi-user.target.wants/{{ item }}"
+        state: link
+      with_items:
+        - "raspapd.service"
+        - "set-hostapd-iface.service"
+
+    - name: Download dnsmasq config
+      get_url:
+        url: "{{ config_base_url }}/butterbox-dnsmasq.conf"
+        dest: /etc/dnsmasq.d/butterbox-dnsmasq.conf
+        owner: root
+        group: root
+        mode: '0644'
+
+    - name: Replace REPLACEME with butter_name in dnsmasq config
+      replace:
+        path: "/etc/dnsmasq.d/butterbox-dnsmasq.conf"
+        regexp: 'REPLACEME'
+        replace: "{{ butter_name }}"
+
+    - name: Restart service raspapd, issue daemon-reload to pick up config changes
+      ansible.builtin.systemd_service:
+        state: restarted
+        daemon_reload: true
+        name: "{{ item }}"
+      when: not (is_vmdb2 | bool)
+      with_items:
+        - raspapd
+        - set-hostapd-iface

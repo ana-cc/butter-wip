@@ -1,0 +1,106 @@
+---
+- name: Install keanu weblite
+  hosts: all
+  become: true
+  tasks:
+    - name: Install deps
+      apt:
+        name:
+          - python3-venv
+          - python3-pip
+        state: present
+        update_cache: yes
+
+    - name: Install Node.js 22 (needed for matrix-js-sdk)
+      shell: |
+        curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
+        apt-get install -y nodejs
+      args:
+        executable: /bin/bash
+
+    - name: Ensure previous keanu-weblite temp directory is removed
+      file:
+        path: /tmp/keanu-weblite
+        state: absent
+
+    - name: Clone keanu-weblite repository (dev branch)
+      git:
+        repo: https://gitlab.com/keanuapp/keanuapp-weblite.git
+        dest: /tmp/keanu-weblite
+        version: dev
+        depth: 1
+
+    - name: Run npm install
+      shell: npm install
+      args:
+        chdir: /tmp/keanu-weblite
+
+    - name: Download keanu-weblite config file
+      get_url:
+        url: "{{ config_base_url }}/keanu-weblite-config.json"
+        dest: /tmp/keanu-weblite/src/assets/config.json
+        mode: '0644'
+
+    - name: Replace REPLACEME with butter_name in config.json
+      replace:
+        path: /tmp/keanu-weblite/src/assets/config.json
+        regexp: 'REPLACEME'
+        replace: "{{ butter_name }}"
+
+    - name: Run npm build with legacy OpenSSL option
+      shell: |
+        export NODE_OPTIONS=--openssl-legacy-provider
+        npm run build
+      args:
+        chdir: /tmp/keanu-weblite
+
+    - name: Copy build output to /var/www/html/chat
+      become: true
+      command: cp -r /tmp/keanu-weblite/dist/. /var/www/html/chat/
+
+    - name: Set permissions for /var/www/html/chat
+      become: true
+      file:
+        path: /var/www/html/chat
+        owner: www-data
+        group: www-data
+        mode: '0755'
+        recurse: yes
+
+    - name: Create butter virtual environment
+      command: python3 -m venv "/home/{{ butter_user }}/butter"
+      args:
+        creates: "/home/{{ butter_user }}/butter/bin/activate"
+
+    - name: Install matrix-nio in virtualenv
+      shell: |
+        source "/home/{{ butter_user }}/butter/bin/activate"
+        pip install matrix-nio
+      args:
+        executable: /bin/bash
+
+    - name: Restart lighttpd service
+      ansible.builtin.systemd:
+        name: lighttpd
+        state: restarted
+      when: not (is_vmdb2 | bool)
+
+    - name: Start lighttpd manually
+      shell: |
+        lighttpd -D &
+      async: 0
+      poll: 0
+      when: is_vmdb2 | bool
+
+    - name: Download create_public_room script
+      get_url:
+        url: "{{ script_base_url }}/create_public_room.py"
+        dest: /tmp/create_public_room.py
+        mode: '0644'
+
+    - name: Create butter room
+      shell: |
+        source "/home/{{ butter_user }}/butter/bin/activate"
+        python /tmp/create_public_room.py {{ butter_language }} {{ butter_name }}
+      args:
+        executable: /bin/bash

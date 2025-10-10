@@ -1,0 +1,5 @@
+ansible_host: 192.168.2.104
+ansible_user: ana
+ansible_password: ana
+is_vmdb2: "false"
+butter_user: "butter"

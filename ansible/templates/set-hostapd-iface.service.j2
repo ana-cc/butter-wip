@@ -1,0 +1,11 @@
+[Unit]
+Description=Set Hostapd Interface at Boot
+After=network.target systemd-udev-settle.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/set_hostapd_iface.py
+RemainAfterExit=true
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,11 @@
+butter_language: en
+butter_name: butter-box
+go_version: "1.24.6"
+go_arch_map:
+  x86_64: "amd64"
+  aarch64: "arm64"
+script_base_url: "https://gitlab.com/likebutter/butterbox-rpi/-/raw/main/scripts"
+config_base_url: "https://gitlab.com/likebutter/butterbox-rpi/-/raw/main/configs"
+
+is_vmdb2: "true"
+butter_user: "pi"

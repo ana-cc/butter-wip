@@ -179,8 +179,8 @@ steps:
       echo "image based on revision: ff7fdbf (Switch from qemu-debootstrap to debootstrap., 2024-01-01) and build on 2025-08-26 14:22 (UTC)" > "/etc/raspi-image-id"
 
   - ansible: tag-root 
-    playbook: deploy-butter-site.yml
-
-  - ansible: tag-root 
-    playbook: install-chat.yml
+    playbook: main.yml
+    extra_vars:
+      butter_language: en
+      butter_name: butter-matrix
 

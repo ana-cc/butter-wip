@@ -2,98 +2,24 @@
 - name: Install chat
   hosts: all
   become: true
-  vars:
-    butter_src_dir: ../butterbox-rpi
-    butter_name: butter-matrix
-
   tasks:
-    - name: Ensure pi user exists
-      ansible.builtin.user:
-        name: pi
-        state: present
-    
-    - name: Ensure pi group exists
-      ansible.builtin.group:
-        name: pi
-        state: present
-    
-    - name: Install git and vim
+    - name: Install deps
       apt:
         name:
           - git
           - vim
           - lighttpd
-          - python3-venv
-          - python3-pip
         state: present
         update_cache: yes
 
-    - name: Install Node.js 22 (needed for matrix-js-sdk)
-      shell: |
-        curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
-        apt-get install -y nodejs
-      args:
-        executable: /bin/bash
-    
-    - name: Ensure previous keanu-weblite temp directory is removed
-      file:
-        path: /tmp/keanu-weblite
-        state: absent
-    
-    - name: Clone keanu-weblite repository (dev branch)
-      git:
-        repo: https://gitlab.com/keanuapp/keanuapp-weblite.git
-        dest: /tmp/keanu-weblite
-        version: dev
-        depth: 1
-    
-    - name: Run npm install
-      shell: npm install
-      args:
-        chdir: /tmp/keanu-weblite
-    
-    - name: Copy keanu-weblite config file
-      copy:
-        src: "{{ butter_src_dir }}/configs/keanu-weblite-config.json"
-        dest: /tmp/keanu-weblite/src/assets/config.json
-        mode: '0644'
-    
-    - name: Replace REPLACEME with butter_name in config.json
-      replace:
-        path: /tmp/keanu-weblite/src/assets/config.json
-        regexp: 'REPLACEME'
-        replace: "{{ butter_name }}"
-    
-    - name: Run npm build with legacy OpenSSL option
-      shell: |
-        export NODE_OPTIONS=--openssl-legacy-provider
-        npm run build
-      args:
-        chdir: /tmp/keanu-weblite
-    
-    - name: Copy build output to /var/www/html/chat
-      copy:
-        src: /tmp/keanu-weblite/dist/
-        dest: /var/www/html/chat/
-        owner: www-data
-        group: www-data
-        mode: '0755'
-    
-    - name: Create butter virtual environment
-      command: python3 -m venv /home/pi/butter
-      args:
-        creates: /home/pi/butter/bin/activate
-    
-    - name: Install matrix-nio in virtualenv
-      shell: |
-        source /home/pi/butter/bin/activate
-        pip install matrix-nio
-      args:
-        executable: /bin/bash
+    # install Go
+    - name: Debug Go download URL
+      debug:
+        msg: "Go download URL: https://go.dev/dl/go{{ go_version }}.linux-{{ go_arch_map[ansible_architecture] }}.tar.gz"
 
     - name: Download Go tarball
       get_url:
-        url: https://go.dev/dl/go1.24.6.linux-arm64.tar.gz
+        url: "https://go.dev/dl/go{{ go_version }}.linux-{{ go_arch_map[ansible_architecture] }}.tar.gz"
         dest: /tmp/go.tar.gz
         mode: '0644'
 
@@ -106,105 +32,114 @@
 
     - name: Ensure Go path is in .profile
       lineinfile:
-        path: /home/pi/.profile
+        path: "/home/{{ butter_user }}/.profile"
         line: 'PATH=$PATH:/usr/local/go/bin'
         insertafter: EOF
         state: present
         create: yes
-      become: false
-
-    - name: Ensure GOPATH is set in .profile
-      lineinfile:
-        path: /home/pi/.profile
-        line: 'GOPATH=$HOME/golang'
-        insertafter: EOF
-        state: present
-        create: yes
-      become: false
 
     - name: Remove existing dendrite directory if it exists
       file:
-        path: /home/pi/dendrite
+        path: "/home/{{ butter_user }}/dendrite"
         state: absent
 
     - name: Clone dendrite repo
       git:
         repo: https://github.com/matrix-org/dendrite
-        dest: /home/pi/dendrite
+        dest: "/home/{{ butter_user }}/dendrite"
         version: v0.13.7
         force: yes
         update: no
         depth: 1
-      become: false
 
     - name: Build dendrite
       command: /usr/local/go/bin/go build -o bin/ ./cmd/...
       args:
-        chdir: /home/pi/dendrite
+        chdir: "/home/{{ butter_user }}/dendrite"
 
-    - name: Copy Dendrite config to target
-      copy:
-        src: "{{ butter_src_dir }}/configs/butterbox-dendrite.conf"
-        dest: /home/pi/dendrite/butterbox-dendrite.conf
-        owner: pi
-        group: pi
+    - name: Generate Matrix signing key
+      command: ./bin/generate-keys --private-key matrix_key.pem
+      args:
+        chdir: "/home/{{ butter_user }}/dendrite"
+
+    - name: Generate self-signed TLS certificate (optional)
+      command: ./bin/generate-keys --tls-cert server.crt --tls-key server.key
+      args:
+        chdir: "/home/{{ butter_user }}/dendrite"
+
+    - name: Download Dendrite config to target
+      get_url:
+        url: "{{ config_base_url }}/butterbox-dendrite.conf"
+        dest: "/home/{{ butter_user }}/dendrite/butterbox-dendrite.conf"
+        owner: "{{ butter_user }}"
+        group: "{{ butter_user }}"
         mode: '0644'
 
     - name: Replace REPLACEME with butter_name in config
       replace:
-        path: /home/pi/dendrite/butterbox-dendrite.conf
+        path: "/home/{{ butter_user }}/dendrite/butterbox-dendrite.conf"
         regexp: 'REPLACEME'
         replace: "{{ butter_name }}"
-      become: false
+
+    - name: Replace /home/pi with /home/butter_user in config
+      replace:
+        path: "/home/{{ butter_user }}/dendrite/butterbox-dendrite.conf"
+        regexp: '/pi/'
+        replace: "/{{ butter_user }}/"
 
     - name: Create log directory for Dendrite
       file:
         path: /var/log/dendrite
         state: directory
-        owner: pi
-        group: pi
+        owner: "{{ butter_user }}"
+        group: "{{ butter_user }}"
         mode: '0755'
 
-    - name: Ensure pi owns Dendrite directory
+    - name: Ensure butter_user owns Dendrite directory
       file:
-        path: /home/pi/dendrite
+        path: "/home/{{ butter_user }}/dendrite"
         state: directory
         recurse: yes
-        owner: pi
-        group: pi
+        owner: "{{ butter_user }}"
+        group: "{{ butter_user }}"
 
-    - name: Copy dendrite systemd service file
-      copy:
-        src: "{{ butter_src_dir }}/configs/butterbox-dendrite.service"
+    - name: Download dendrite systemd service file
+      get_url:
+        url: "{{ config_base_url }}/butterbox-dendrite.service"
         dest: /lib/systemd/system/dendrite.service
         owner: root
         group: root
         mode: '0644'
 
- 
-    
-    - name: Generate Matrix signing key
-      command: ./bin/generate-keys --private-key matrix_key.pem
-      args:
-        chdir: /home/pi/dendrite
-      become: false
+    - name: Replace /home/pi with /home/butter_user in service file
+      replace:
+        path: /lib/systemd/system/dendrite.service
+        regexp: '/pi/'
+        replace: "/{{ butter_user }}/"
 
-    - name: Generate self-signed TLS certificate (optional)
-      command: ./bin/generate-keys --tls-cert server.crt --tls-key server.key
-      args:
-        chdir: /home/pi/dendrite
-      become: false
+    - name: Replace pi with butter_user in service file
+      replace:
+        path: /lib/systemd/system/dendrite.service
+        regexp: 'User=pi'
+        replace: "User={{ butter_user }}"
 
     - name: Enable dendrite by symlink
       file:
         src: /lib/systemd/system/dendrite.service
         dest: /etc/systemd/system/multi-user.target.wants/dendrite.service
         state: link
-      become: true
- 
-    - name: Copy Matrix reverse proxy config for Lighttpd
-      copy:
-        src: "{{ butter_src_dir }}/configs/50-matrix-reverse-proxy.conf"
+
+    - name: Restart service dendrite, issue daemon-reload to pick up config changes
+      ansible.builtin.systemd_service:
+        state: restarted
+        daemon_reload: true
+        name: dendrite
+      when: not (is_vmdb2 | bool)
+
+
+    - name: Download Matrix reverse proxy config for Lighttpd
+      get_url:
+        url: "{{ config_base_url }}/50-matrix-reverse-proxy.conf"
         dest: /etc/lighttpd/conf-available/50-matrix-reverse-proxy.conf
         owner: root
         group: root
@@ -223,3 +158,14 @@
         state: link
         force: true
 
+    - name: Start dendrite as user butter_user
+      become: yes
+      become_user: "{{ butter_user }}"
+      shell: |
+        nohup /home/{{ butter_user }}/dendrite/bin/dendrite \
+          --config /home/{{ butter_user }}/dendrite/butterbox-dendrite.conf \
+          -really-enable-open-registration \
+          > /var/log/butter/dendrite-provision.log 2>&1 &
+      args:
+        chdir: "/home/{{ butter_user }}"
+      when: is_vmdb2 | bool

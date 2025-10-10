@@ -1,0 +1,12 @@
+---
+- name: Install chat
+  hosts: all
+  become: true
+  tasks:
+    - name: Set minimal firmware for cyfmac43455-sdio.bin
+      # This loads a firmware that takes up less of the SRAM used by the WiFi chip, which allows more simultaneous connections (~19 instead of 4–8).
+      ansible.builtin.command:
+        cmd: update-alternatives --set cyfmac43455-sdio.bin /lib/firmware/cypress/cyfmac43455-sdio-minimal.bin
+      register: firmware_update
+      changed_when: firmware_update.rc == 0
+      failed_when: firmware_update.rc != 0

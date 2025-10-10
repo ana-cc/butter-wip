@@ -1,0 +1,19 @@
+# main.yml
+- import_playbook: butter-base.yml
+  tags:
+    - "base"
+    - "ap"
+- import_playbook: install-rasp-ap.yml
+  tags: "ap"
+  when:  ap_mode_supported | bool
+- import_playbook: deploy-butter-site.yml
+  tags: "website"
+- import_playbook: install-chat.yml
+  tags: "matrix"
+- import_playbook: install-keanu-weblite.yml
+  tags:
+    - "matrix"
+    - "keanu"
+- import_playbook: install-ap-optimized-firmware.yml
+  tags: "ap"
+  when: ap_mode_supported | bool

@@ -1,0 +1,28 @@
+---
+- name: Butter Base
+  hosts: all
+  become: true
+  tasks:
+    - name: Ensure butter_user user exists
+      ansible.builtin.user:
+        name: "{{ butter_user }}"
+        state: present
+
+    - name: Ensure butter_user group exists
+      ansible.builtin.group:
+        name: "{{ butter_user }}"
+        state: present
+
+    - name: Get supported interface modes
+      command: iw list
+      register: iw_list
+      ignore_errors: yes
+
+    - name: Search for AP mode support
+      set_fact:
+        ap_mode_supported: "{{ 'AP' in iw_list.stdout }}"
+
+    - name: Show AP mode support result
+      debug:
+        msg: >
+          Wi-Fi AP mode supported: {{ ap_mode_supported }}
