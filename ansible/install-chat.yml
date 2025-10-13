@@ -9,8 +9,10 @@
           - git
           - vim
           - lighttpd
+          - sudo
         state: present
         update_cache: yes
+      when: not ( is_vmdb2 | bool )
 
     # install Go
     - name: Debug Go download URL
@@ -74,6 +76,16 @@
         owner: "{{ butter_user }}"
         group: "{{ butter_user }}"
         mode: '0644'
+      when: not ( is_vmdb2 | bool )
+
+    - name: Copy Dendrite config to target
+      copy:
+        src: "{{ vmdb2_config_base_dir }}/butterbox-dendrite.conf"
+        dest: "/home/{{ butter_user }}/dendrite/butterbox-dendrite.conf"
+        owner: "{{ butter_user }}"
+        group: "{{ butter_user }}"
+        mode: '0644'
+      when: is_vmdb2 | bool 
 
     - name: Replace REPLACEME with butter_name in config
       replace:
@@ -110,6 +122,16 @@
         owner: root
         group: root
         mode: '0644'
+      when: not ( is_vmdb2 | bool )
+
+    - name: Copy dendrite systemd service file
+      copy:
+        src: "{{ vmdb2_config_base_dir }}/butterbox-dendrite.service"
+        dest: /lib/systemd/system/dendrite.service
+        owner: root
+        group: root
+        mode: '0644'
+      when: is_vmdb2 | bool
 
     - name: Replace /home/pi with /home/butter_user in service file
       replace:
@@ -144,6 +166,16 @@
         owner: root
         group: root
         mode: '0644'
+      when: not (is_vmdb2 | bool)
+
+    - name: Copy Matrix reverse proxy config for Lighttpd
+      copy:
+        src: "{{ vmdb2_config_base_dir }}/50-matrix-reverse-proxy.conf"
+        dest: /etc/lighttpd/conf-available/50-matrix-reverse-proxy.conf
+        owner: root
+        group: root
+        mode: '0644'
+      when: is_vmdb2 | bool
  
     - name: Ensure old symlink is removed if it exists
       file:

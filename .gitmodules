@@ -1,0 +1,3 @@
+[submodule "vmdb2-recipes/ansible/scripts/butterbox-rpi"]
+	path = vmdb2-recipes/ansible/scripts/butterbox-rpi
+	url = https://gitlab.com/likebutter/butterbox-rpi/

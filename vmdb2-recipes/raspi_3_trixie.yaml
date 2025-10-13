@@ -4,7 +4,7 @@
 
 steps:
   - mkimg: "{{ output }}"
-    size: 4500M
+    size: 6500M
 
   - mklabel: msdos
     device: "{{ output }}"
@@ -38,6 +38,8 @@ steps:
     mount-on: tag-root
     dirname: '/boot/firmware'
 
+  - virtual-filesystems: tag-root
+
   - unpack-rootfs: tag-root
 
   - debootstrap: trixie
@@ -63,15 +65,16 @@ steps:
     unless: rootfs_unpacked
 
   - copy-file: /etc/initramfs-tools/hooks/rpi-resizerootfs
-    src: rootfs/etc/initramfs-tools/hooks/rpi-resizerootfs
+    src: ./image-specs/rootfs/etc/initramfs-tools/hooks/rpi-resizerootfs
     perm: 0755
     unless: rootfs_unpacked
 
   - copy-file: /etc/initramfs-tools/scripts/local-bottom/rpi-resizerootfs
-    src: rootfs/etc/initramfs-tools/scripts/local-bottom/rpi-resizerootfs
+    src: ./image-specs/rootfs/etc/initramfs-tools/scripts/local-bottom/rpi-resizerootfs
     perm: 0755
     unless: rootfs_unpacked
 
+  - virtual-filesystems: tag-root # mounted twice cause of https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=1056546
   - apt: install
     packages:
       - ca-certificates
@@ -80,13 +83,24 @@ steps:
       - parted
       - ssh
       - wpasupplicant
+      - dnsmasq
       - systemd-timesyncd
       - linux-image-arm64
       - raspi-firmware
       - firmware-brcm80211
       - bluez-firmware
       - curl
+      - git
       - python3
+      - unzip
+      - locales-all
+      - dhcpcd
+      - wget
+      - iw
+      - lighttpd
+      - sudo
+      - python3-venv
+      - python3-pip
       - unzip
     tag: tag-root
     unless: rootfs_unpacked
@@ -100,14 +114,14 @@ steps:
       # Allow root logins locally with no password
       sed -i 's,root:[^:]*:,root::,' "${ROOT?}/etc/shadow"
 
-      install -m 644 -o root -g root rootfs/etc/fstab "${ROOT?}/etc/fstab"
+      install -m 644 -o root -g root ./image-specs/rootfs/etc/fstab "${ROOT?}/etc/fstab"
 
-      install -m 644 -o root -g root rootfs/etc/network/interfaces.d/eth0 "${ROOT?}/etc/network/interfaces.d/eth0"
-      install -m 600 -o root -g root rootfs/etc/network/interfaces.d/wlan0 "${ROOT?}/etc/network/interfaces.d/wlan0"
+      install -m 644 -o root -g root ./image-specs/rootfs/etc/network/interfaces.d/eth0 "${ROOT?}/etc/network/interfaces.d/eth0"
+      install -m 600 -o root -g root ./image-specs/rootfs/etc/network/interfaces.d/wlan0 "${ROOT?}/etc/network/interfaces.d/wlan0"
 
-      install -m 755 -o root -g root rootfs/usr/local/sbin/rpi-set-sysconf "${ROOT?}/usr/local/sbin/rpi-set-sysconf"
-      install -m 644 -o root -g root rootfs/etc/systemd/system/rpi-set-sysconf.service "${ROOT?}/etc/systemd/system/"
-      install -m 644 -o root -g root rootfs/boot/firmware/sysconf.txt "${ROOT?}/boot/firmware/sysconf.txt"
+      install -m 755 -o root -g root ./image-specs/rootfs/usr/local/sbin/rpi-set-sysconf "${ROOT?}/usr/local/sbin/rpi-set-sysconf"
+      install -m 644 -o root -g root ./image-specs/rootfs/etc/systemd/system/rpi-set-sysconf.service "${ROOT?}/etc/systemd/system/"
+      install -m 644 -o root -g root ./image-specs/rootfs/boot/firmware/sysconf.txt "${ROOT?}/boot/firmware/sysconf.txt"
       mkdir -p "${ROOT?}/etc/systemd/system/basic.target.requires/"
       ln -s /etc/systemd/system/rpi-set-sysconf.service "${ROOT?}/etc/systemd/system/basic.target.requires/rpi-set-sysconf.service"
 
@@ -115,14 +129,14 @@ steps:
       rm -f "${ROOT?}/etc/initramfs-tools/hooks/rpi-resizerootfs"
       rm -f "${ROOT?}/etc/initramfs-tools/scripts/local-bottom/rpi-resizerootfs"
 
-      install -m 644 -o root -g root rootfs/etc/systemd/system/rpi-reconfigure-raspi-firmware.service "${ROOT?}/etc/systemd/system/"
+      install -m 644 -o root -g root ./image-specs/rootfs/etc/systemd/system/rpi-reconfigure-raspi-firmware.service "${ROOT?}/etc/systemd/system/"
       mkdir -p "${ROOT?}/etc/systemd/system/multi-user.target.requires/"
       ln -s /etc/systemd/system/rpi-reconfigure-raspi-firmware.service "${ROOT?}/etc/systemd/system/multi-user.target.requires/rpi-reconfigure-raspi-firmware.service"
 
-      install -m 644 -o root -g root rootfs/etc/systemd/system/rpi-generate-ssh-host-keys.service "${ROOT?}/etc/systemd/system/"
+      install -m 644 -o root -g root ./image-specs/rootfs/etc/systemd/system/rpi-generate-ssh-host-keys.service "${ROOT?}/etc/systemd/system/"
       ln -s /etc/systemd/system/rpi-generate-ssh-host-keys.service "${ROOT?}/etc/systemd/system/multi-user.target.requires/rpi-generate-ssh-host-keys.service"
       rm -f "${ROOT?}"/etc/ssh/ssh_host_*_key*
-
+      which wget
     root-fs: tag-root
 
   # Copy the relevant device tree files to the boot partition
@@ -179,8 +193,9 @@ steps:
       echo "image based on revision: ff7fdbf (Switch from qemu-debootstrap to debootstrap., 2024-01-01) and build on 2025-08-26 14:22 (UTC)" > "/etc/raspi-image-id"
 
   - ansible: tag-root 
-    playbook: main.yml
+    #tags: matrix
+    playbook: ../ansible/main.yml
+    config_file: ./ansible.cfg
     extra_vars:
       butter_language: en
-      butter_name: butter-matrix
-
+      butter_name: butter-box

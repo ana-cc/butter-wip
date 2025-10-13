@@ -17,12 +17,24 @@
       command: iw list
       register: iw_list
       ignore_errors: yes
+      when: not (is_vmdb2 | bool)
 
     - name: Search for AP mode support
       set_fact:
         ap_mode_supported: "{{ 'AP' in iw_list.stdout }}"
+      when: not (is_vmdb2 | bool)
 
     - name: Show AP mode support result
       debug:
         msg: >
           Wi-Fi AP mode supported: {{ ap_mode_supported }}
+      when: not (is_vmdb2 | bool)
+
+    - name: Make sure /etc/resolv.conf is populated
+      lineinfile:
+        path: /etc/resolv.conf
+        regexp: '^nameserver 1.1.1.1'
+        line: 'nameserver 1.1.1.1'
+        state: present
+        insertafter: EOF
+        create: yes
