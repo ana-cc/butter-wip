@@ -10,3 +10,4 @@
       register: firmware_update
       changed_when: firmware_update.rc == 0
       failed_when: firmware_update.rc != 0
+      ignore_errors: yes

@@ -1,0 +1,63 @@
+# create_public_room.py
+
+# This script creates a #public matrix room if one does not exist yet.
+import asyncio
+import nio
+import urllib
+import string
+import sys
+import os
+
+FLAG_FILE = "/home/{{ butter_user }}/public_room_created"
+
+if os.path.exists(FLAG_FILE):
+    print("Public room already created, exiting.")
+    exit(0)
+
+REGISTRATION_ENDPOINT = "client/r0/register"
+
+ROOM_TOPICS = {
+    "en": "This is a public, unencrypted room.  To have a private conversation, create a new room.",
+    "es": "Esta es una sala de chat pública y sin cifrar. Para tener una conversación privada, crea una nueva sala.",
+}
+
+async def main(butter_language, butter_name):
+    print("creating public room")
+
+    room_name = "public"
+    room_topic = ROOM_TOPICS.get(butter_language, ROOM_TOPICS["en"])
+    matrix_domain = "{}.lan".format(butter_name)
+    weblite_address = "http://{}/chat/".format(matrix_domain)
+
+    client = nio.AsyncClient("http://localhost")
+    username = "butterbox-admin"
+    password = "butterbox-admin"
+
+    # Create & log in as a disposable user
+    reg_coro = client.register(
+        username=username,
+        password=password,
+        device_name=butter_name,
+    )
+    reg_result = await reg_coro
+    print("registration result:", reg_result)
+
+    room_coro = client.room_create(
+        visibility=nio.RoomVisibility.public,
+        alias=room_name,
+        preset=nio.RoomPreset.public_chat,
+        topic=room_topic,
+    )
+    room_creation_result = await room_coro
+    room_name_url = urllib.parse.quote_plus("#{}:{}".format(room_name, matrix_domain))
+    print("room creation result", room_creation_result)
+
+    await client.close()
+
+    print("created room: {}#/room/{}".format(weblite_address, room_name_url))
+    with open(FLAG_FILE, "w") as f:
+        f.write("1")
+        
+
+if __name__ == "__main__":
+    asyncio.run(main(butter_language="{{ butter_language }}", butter_name="{{ butter_name }}"))

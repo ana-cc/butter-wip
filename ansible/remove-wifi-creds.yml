@@ -1,0 +1,11 @@
+---
+- name: Remove wifi creds
+  hosts: all
+  become: true
+  tasks:
+    - name: Copy wpa_supplicant config
+      copy:
+        src: "{{ vmdb2_config_base_dir }}/wpa_supplicant.conf"
+        dest: /etc/wpa_supplicant/wpa_supplicant.conf
+        force: true
+        mode: '0644'

@@ -1,0 +1,45 @@
+---
+- name: Install usb viewer
+  hosts: all
+  become: true
+  tasks:
+    - name: Copy systemd services
+      copy:
+        src: "{{ vmdb2_config_base_dir }}/{{ item }}"
+        dest: "/etc/systemd/system/{{ item }}"
+      loop:
+        - udisks2-mount@.service
+        - serve-usb@.service
+
+    - name: Copy web UI assets (remote to remote)
+      copy:
+        src: "/var/www/html/assets/{{ item.src }}"
+        dest: "/var/www/html/{{ item.dest }}"
+        remote_src: true
+      loop:
+        - { src: "css/butter-dir-listing.css", dest: "butter-dir-listing.css" }
+        - { src: "js/butter-dir-listing.js", dest: "butter-dir-listing.js" }
+
+    - name: Install Lighttpd USB config
+      copy:
+        src: "{{ vmdb2_config_base_dir }}/50-usb-butter.conf"
+        dest: "/etc/lighttpd/conf-available/50-usb-butter.conf"
+
+    - name: Install udev rule
+      copy:
+        src: "{{ vmdb2_config_base_dir }}/99-usb-butter.rules"
+        dest: "/etc/udev/rules.d/99-usb-butter.rules"
+
+    - name: Install udev trigger script
+      copy:
+        src: "{{ vmdb2_script_base_dir }}/on-usb-drive-mounted.sh"
+        dest: /usr/bin/on-usb-drive-mounted.sh
+        mode: '0755'
+
+    - name: Reload udev rules
+      command: udevadm control --reload-rules
+      when: not (is_vmdb2 | bool)
+
+    - name: Reload systemd daemon
+      command: systemctl daemon-reload
+      when: not (is_vmdb2 | bool)

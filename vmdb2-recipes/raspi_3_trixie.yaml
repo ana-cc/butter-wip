@@ -4,7 +4,7 @@
 
 steps:
   - mkimg: "{{ output }}"
-    size: 6500M
+    size: 5500M
 
   - mklabel: msdos
     device: "{{ output }}"
@@ -77,31 +77,29 @@ steps:
   - virtual-filesystems: tag-root # mounted twice cause of https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=1056546
   - apt: install
     packages:
-      - ca-certificates
-      - dosfstools
-      - iw
-      - parted
-      - ssh
-      - wpasupplicant
-      - dnsmasq
-      - systemd-timesyncd
-      - linux-image-arm64
-      - raspi-firmware
-      - firmware-brcm80211
       - bluez-firmware
+      - ca-certificates
       - curl
-      - git
-      - python3
-      - unzip
-      - locales-all
       - dhcpcd
-      - wget
+      - dnsmasq
+      - dosfstools
+      - firmware-brcm80211
+      - git
       - iw
       - lighttpd
-      - sudo
-      - python3-venv
+      - linux-image-arm64
+      - locales-all
+      - parted
+      - python3
       - python3-pip
+      - python3-venv
+      - raspi-firmware
+      - ssh
+      - sudo
+      - systemd-timesyncd
       - unzip
+      - wget
+      - wpasupplicant
     tag: tag-root
     unless: rootfs_unpacked
 
@@ -136,7 +134,6 @@ steps:
       install -m 644 -o root -g root ./image-specs/rootfs/etc/systemd/system/rpi-generate-ssh-host-keys.service "${ROOT?}/etc/systemd/system/"
       ln -s /etc/systemd/system/rpi-generate-ssh-host-keys.service "${ROOT?}/etc/systemd/system/multi-user.target.requires/rpi-generate-ssh-host-keys.service"
       rm -f "${ROOT?}"/etc/ssh/ssh_host_*_key*
-      which wget
     root-fs: tag-root
 
   # Copy the relevant device tree files to the boot partition
@@ -193,9 +190,8 @@ steps:
       echo "image based on revision: ff7fdbf (Switch from qemu-debootstrap to debootstrap., 2024-01-01) and build on 2025-08-26 14:22 (UTC)" > "/etc/raspi-image-id"
 
   - ansible: tag-root 
-    #tags: matrix
     playbook: ../ansible/main.yml
     config_file: ./ansible.cfg
     extra_vars:
       butter_language: en
-      butter_name: butter-box
+      butter_name: butter-box-3
