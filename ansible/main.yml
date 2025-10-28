@@ -4,9 +4,11 @@
     - "base"
     - "ap"
     - "matrix"
+
 - import_playbook: install-rasp-ap.yml
   tags: "ap"
   when:  ap_mode_supported | bool
+
 - import_playbook: deploy-butter-site.yml
   tags: 
     - "website"

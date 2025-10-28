@@ -11,6 +11,15 @@
         - udisks2-mount@.service
         - serve-usb@.service
 
+    - name: Enable services by symlink
+      file:
+        src: "/etc/systemd/system/{{ item  }}"
+        dest: "/etc/systemd/system/multi-user.target.wants/{{ item }}"
+        state: link
+      loop:
+        - udisks2-mount@.service
+        - serve-usb@.service
+
     - name: Copy web UI assets (remote to remote)
       copy:
         src: "/var/www/html/assets/{{ item.src }}"

@@ -41,7 +41,9 @@ async def main(butter_language, butter_name):
     )
     reg_result = await reg_coro
     print("registration result:", reg_result)
-
+    if "already taken" in str(reg_result):
+        print("Room already exists. Exiting.")
+        sys.exit(0)
     room_coro = client.room_create(
         visibility=nio.RoomVisibility.public,
         alias=room_name,

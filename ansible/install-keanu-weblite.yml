@@ -23,6 +23,7 @@
       file:
         path: /tmp/keanu-weblite
         state: absent
+      delegate_to: localhost
 
     - name: Clone keanu-weblite repository (dev branch)
       git:
@@ -30,31 +31,27 @@
         dest: /tmp/keanu-weblite
         version: dev
         depth: 1
+      delegate_to: localhost
 
     - name: Run npm install
       shell: npm install
       args:
         chdir: /tmp/keanu-weblite
+      delegate_to: localhost
 
     - name: Download keanu-weblite config file
       get_url:
         url: "{{ config_base_url }}/keanu-weblite-config.json"
         dest: /tmp/keanu-weblite/src/assets/config.json
         mode: '0644'
-      when: not ( is_vmdb2 | bool )
-
-    - name: Copy keanu-weblite config file
-      copy:
-        src: "{{ vmdb2_config_base_dir }}/keanu-weblite-config.json"
-        dest: /tmp/keanu-weblite/src/assets/config.json
-        mode: '0644'
-      when: is_vmdb2 | bool 
+      delegate_to: localhost
 
     - name: Replace REPLACEME with butter_name in config.json
       replace:
         path: /tmp/keanu-weblite/src/assets/config.json
         regexp: 'REPLACEME'
         replace: "{{ butter_name }}"
+      delegate_to: localhost
 
     - name: Run npm build with legacy OpenSSL option
       shell: |
@@ -62,10 +59,13 @@
         npm run build
       args:
         chdir: /tmp/keanu-weblite
+      delegate_to: localhost
 
     - name: Copy build output to /var/www/html/chat
       become: true
-      command: cp -r /tmp/keanu-weblite/dist/. /var/www/html/chat/
+      copy: 
+         src:  /tmp/keanu-weblite/dist/
+         dest:  /var/www/html/chat/
 
     - name: Set permissions for /var/www/html/chat
       become: true
@@ -80,6 +80,7 @@
       command: python3 -m venv "/home/{{ butter_user }}/butter"
       args:
         creates: "/home/{{ butter_user }}/butter/bin/activate"
+      become_user: "{{ butter_user }}"
 
     - name: Install matrix-nio in virtualenv
       shell: |
@@ -98,13 +99,13 @@
         src: "create_public_room.py.j2"
         dest: "/home/{{ butter_user }}/create_public_room.py"
         mode: '0755'
+        owner: "{{ butter_user }}"
+        group: "{{ butter_user }}"
 
     - name: Create public room on reboot
       template:
         src: "create-public-room.service.j2"
         dest: /lib/systemd/system/create-public-room.service
-        owner: root
-        group: root
         mode: '0644'
 
     - name: Enable create-public-room room service script by symlink

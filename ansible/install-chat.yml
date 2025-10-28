@@ -15,49 +15,63 @@
       when: not ( is_vmdb2 | bool )
 
     # install Go
-    - name: Debug Go download URL
-      debug:
-        msg: "Go download URL: https://go.dev/dl/go{{ go_version }}.linux-{{ go_arch_map[ansible_architecture] }}.tar.gz"
+#    #    - name: Download Go tarball
+#      get_url:
+#        url: "https://go.dev/dl/go{{ go_version }}.linux-{{ go_arch_map[ansible_architecture] }}.tar.gz"
+#        dest: /tmp/go.tar.gz
+#        mode: '0644'
+#
+#    - name: Extract Go to /usr/local
+#      unarchive:
+#        src: /tmp/go.tar.gz
+#        dest: /usr/local
+#        remote_src: yes
+#        creates: /usr/local/go
+#
+#    - name: Ensure Go path is in .profile
+#      lineinfile:
+#        path: "/home/{{ butter_user }}/.profile"
+#        line: 'PATH=$PATH:/usr/local/go/bin'
+#        insertafter: EOF
+#        state: present
+#        create: yes
+#
+#    - name: Remove existing dendrite directory if it exists
+#      file:
+#        path: "/home/{{ butter_user }}/dendrite"
+#        state: absent
+#
+#    - name: Clone dendrite repo
+#      git:
+#        repo: https://github.com/matrix-org/dendrite
+#        dest: "/home/{{ butter_user }}/dendrite"
+#        version: v0.13.7
+#        force: yes
+#        update: no
+#        depth: 1
+#
+#    - name: Build dendrite
+#      command: /usr/local/go/bin/go build -o bin/ ./cmd/...
+#      args:
+#        chdir: "/home/{{ butter_user }}/dendrite"
+#        
+#
 
-    - name: Download Go tarball
-      get_url:
-        url: "https://go.dev/dl/go{{ go_version }}.linux-{{ go_arch_map[ansible_architecture] }}.tar.gz"
-        dest: /tmp/go.tar.gz
-        mode: '0644'
+    - name: copy Dendrite dir to target
+      copy:
+        src: "dendrite/"
+        dest: "/home/{{ butter_user }}/dendrite"
+        owner: "{{ butter_user }}"
+        group: "{{ butter_user }}"
 
-    - name: Extract Go to /usr/local
-      unarchive:
-        src: /tmp/go.tar.gz
-        dest: /usr/local
-        remote_src: yes
-        creates: /usr/local/go
-
-    - name: Ensure Go path is in .profile
-      lineinfile:
-        path: "/home/{{ butter_user }}/.profile"
-        line: 'PATH=$PATH:/usr/local/go/bin'
-        insertafter: EOF
-        state: present
-        create: yes
-
-    - name: Remove existing dendrite directory if it exists
+    - name: Ensure butter_user owns Dendrite directory
       file:
         path: "/home/{{ butter_user }}/dendrite"
-        state: absent
-
-    - name: Clone dendrite repo
-      git:
-        repo: https://github.com/matrix-org/dendrite
-        dest: "/home/{{ butter_user }}/dendrite"
-        version: v0.13.7
-        force: yes
-        update: no
-        depth: 1
-
-    - name: Build dendrite
-      command: /usr/local/go/bin/go build -o bin/ ./cmd/...
-      args:
-        chdir: "/home/{{ butter_user }}/dendrite"
+        state: directory
+        recurse: yes
+        owner: "{{ butter_user }}"
+        group: "{{ butter_user }}"
+        mode: "0755"
 
     - name: Generate Matrix signing key
       command: ./bin/generate-keys --private-key matrix_key.pem
@@ -76,16 +90,6 @@
         owner: "{{ butter_user }}"
         group: "{{ butter_user }}"
         mode: '0644'
-      when: not ( is_vmdb2 | bool )
-
-    - name: Copy Dendrite config to target
-      copy:
-        src: "{{ vmdb2_config_base_dir }}/butterbox-dendrite.conf"
-        dest: "/home/{{ butter_user }}/dendrite/butterbox-dendrite.conf"
-        owner: "{{ butter_user }}"
-        group: "{{ butter_user }}"
-        mode: '0644'
-      when: is_vmdb2 | bool 
 
     - name: Replace REPLACEME with butter_name in config
       replace:
@@ -101,19 +105,12 @@
 
     - name: Create log directory for Dendrite
       file:
-        path: /var/log/dendrite
+        path: "/var/log/dendrite"
         state: directory
         owner: "{{ butter_user }}"
         group: "{{ butter_user }}"
         mode: '0755'
-
-    - name: Ensure butter_user owns Dendrite directory
-      file:
-        path: "/home/{{ butter_user }}/dendrite"
-        state: directory
         recurse: yes
-        owner: "{{ butter_user }}"
-        group: "{{ butter_user }}"
 
     - name: Download dendrite systemd service file
       get_url:
@@ -122,16 +119,6 @@
         owner: root
         group: root
         mode: '0644'
-      when: not ( is_vmdb2 | bool )
-
-    - name: Copy dendrite systemd service file
-      copy:
-        src: "{{ vmdb2_config_base_dir }}/butterbox-dendrite.service"
-        dest: /lib/systemd/system/dendrite.service
-        owner: root
-        group: root
-        mode: '0644'
-      when: is_vmdb2 | bool
 
     - name: Replace /home/pi with /home/butter_user in service file
       replace:
@@ -151,6 +138,15 @@
         dest: /etc/systemd/system/multi-user.target.wants/dendrite.service
         state: link
 
+    - name: Ensure butter_user owns Dendrite directory
+      file:
+        path: "/home/{{ butter_user }}/dendrite"
+        state: directory
+        recurse: yes
+        owner: "{{ butter_user }}"
+        group: "{{ butter_user }}"
+        mode: "0755"
+
     - name: Restart service dendrite, issue daemon-reload to pick up config changes
       ansible.builtin.systemd_service:
         state: restarted
@@ -164,17 +160,7 @@
         owner: root
         group: root
         mode: '0644'
-      when: not (is_vmdb2 | bool)
 
-    - name: Copy Matrix reverse proxy config for Lighttpd
-      copy:
-        src: "{{ vmdb2_config_base_dir }}/50-matrix-reverse-proxy.conf"
-        dest: /etc/lighttpd/conf-available/50-matrix-reverse-proxy.conf
-        owner: root
-        group: root
-        mode: '0644'
-      when: is_vmdb2 | bool
- 
     - name: Ensure old symlink is removed if it exists
       file:
         path: /etc/lighttpd/conf-enabled/50-matrix-reverse-proxy.conf
@@ -187,7 +173,7 @@
         dest: /etc/lighttpd/conf-enabled/50-matrix-reverse-proxy.conf
         state: link
         force: true
-
+#
 #    - name: Start dendrite as user butter_user
 #      become: yes
 #      become_user: "{{ butter_user }}"

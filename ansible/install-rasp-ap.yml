@@ -9,16 +9,6 @@
     raspap_adblock: 0
 
   tasks:
-    - name: Install deps
-      apt:
-        name:
-          - locales-all
-          - dhcpcd
-          - wget
-          - iw
-        state: present
-        update_cache: yes
-
     - name: Check if RaspAP is already installed
       ansible.builtin.stat:
         path: /var/www/html/admin
@@ -89,19 +79,8 @@
         owner: root
         group: root
         mode: '0644'
-      when: not ( is_vmdb2 | bool )
 
-    - name: Copy hostapd raspapd systemd service file
-      copy:
-        src: "{{ vmdb2_config_base_dir }}/raspapd.service"
-        dest: "/lib/systemd/system/raspapd.service"
-        owner: root
-        group: root
-        mode: '0644'
-      when: is_vmdb2 | bool 
-
-
-    - name: Enable service raspapd and set_hostapd_iface by symlink
+    - name: Enable service raspapd, avahi-daemon, and set_hostapd_iface by symlink
       file:
         src: "/lib/systemd/system/{{ item }}"
         dest: "/etc/systemd/system/multi-user.target.wants/{{ item }}"
@@ -109,24 +88,15 @@
       with_items:
         - "raspapd.service"
         - "set-hostapd-iface.service"
-
-    - name: Download dnsmasq config
-      get_url:
-        url: "{{ config_base_url }}/butterbox-dnsmasq.conf"
-        dest: /etc/dnsmasq.d/butterbox-dnsmasq.conf
-        owner: root
-        group: root
-        mode: '0644'
-      when: not ( is_vmdb2 | bool )
+        - "avahi-daemon.service"
 
     - name: Copy dnsmasq config
-      copy:
-        src: "{{ vmdb2_config_base_dir }}/butterbox-dnsmasq.conf"
+      template:
+        src: "butterbox-dnsmasq.conf.j2"
         dest: /etc/dnsmasq.d/butterbox-dnsmasq.conf
         owner: root
         group: root
         mode: '0644'
-      when: is_vmdb2 | bool
 
     - name: Replace REPLACEME with butter_name in dnsmasq config
       replace:
