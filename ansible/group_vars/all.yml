@@ -7,8 +7,8 @@ go_arch_map:
 script_base_url: "https://gitlab.com/likebutter/butterbox-rpi/-/raw/main/scripts"
 config_base_url: "https://gitlab.com/likebutter/butterbox-rpi/-/raw/main/configs"
 
-vmdb2_script_base_dir: "scripts/butterbox-rpi/scripts"
-vmdb2_config_base_dir: "scripts/butterbox-rpi/configs"
+vmdb2_script_base_dir: "butterbox-rpi/scripts"
+vmdb2_config_base_dir: "butterbox-rpi/configs"
 is_vmdb2: "true"
 butter_user: "pi"
 ap_mode_supported: "true"

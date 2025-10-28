@@ -63,12 +63,12 @@ steps:
     unless: rootfs_unpacked
 
   - copy-file: /etc/initramfs-tools/hooks/rpi-resizerootfs
-    src: rootfs/etc/initramfs-tools/hooks/rpi-resizerootfs
+    src: image-specs/rootfs/etc/initramfs-tools/hooks/rpi-resizerootfs
     perm: 0755
     unless: rootfs_unpacked
 
   - copy-file: /etc/initramfs-tools/scripts/local-bottom/rpi-resizerootfs
-    src: rootfs/etc/initramfs-tools/scripts/local-bottom/rpi-resizerootfs
+    src: image-specs/rootfs/etc/initramfs-tools/scripts/local-bottom/rpi-resizerootfs
     perm: 0755
     unless: rootfs_unpacked
 
@@ -111,14 +111,14 @@ steps:
       # Allow root logins locally with no password
       sed -i 's,root:[^:]*:,root::,' "${ROOT?}/etc/shadow"
 
-      install -m 644 -o root -g root rootfs/etc/fstab "${ROOT?}/etc/fstab"
+      install -m 644 -o root -g root image-specs/rootfs/etc/fstab "${ROOT?}/etc/fstab"
 
-      install -m 644 -o root -g root rootfs/etc/network/interfaces.d/eth0 "${ROOT?}/etc/network/interfaces.d/eth0"
-      install -m 600 -o root -g root rootfs/etc/network/interfaces.d/wlan0 "${ROOT?}/etc/network/interfaces.d/wlan0"
+      install -m 644 -o root -g root image-specs/rootfs/etc/network/interfaces.d/eth0 "${ROOT?}/etc/network/interfaces.d/eth0"
+      install -m 600 -o root -g root image-specs/rootfs/etc/network/interfaces.d/wlan0 "${ROOT?}/etc/network/interfaces.d/wlan0"
 
-      install -m 755 -o root -g root rootfs/usr/local/sbin/rpi-set-sysconf "${ROOT?}/usr/local/sbin/rpi-set-sysconf"
-      install -m 644 -o root -g root rootfs/etc/systemd/system/rpi-set-sysconf.service "${ROOT?}/etc/systemd/system/"
-      install -m 644 -o root -g root rootfs/boot/firmware/sysconf.txt "${ROOT?}/boot/firmware/sysconf.txt"
+      install -m 755 -o root -g root image-specs/rootfs/usr/local/sbin/rpi-set-sysconf "${ROOT?}/usr/local/sbin/rpi-set-sysconf"
+      install -m 644 -o root -g root image-specs/rootfs/etc/systemd/system/rpi-set-sysconf.service "${ROOT?}/etc/systemd/system/"
+      install -m 644 -o root -g root image-specs/rootfs/boot/firmware/sysconf.txt "${ROOT?}/boot/firmware/sysconf.txt"
       mkdir -p "${ROOT?}/etc/systemd/system/basic.target.requires/"
       ln -s /etc/systemd/system/rpi-set-sysconf.service "${ROOT?}/etc/systemd/system/basic.target.requires/rpi-set-sysconf.service"
 
@@ -126,11 +126,11 @@ steps:
       rm -f "${ROOT?}/etc/initramfs-tools/hooks/rpi-resizerootfs"
       rm -f "${ROOT?}/etc/initramfs-tools/scripts/local-bottom/rpi-resizerootfs"
 
-      install -m 644 -o root -g root rootfs/etc/systemd/system/rpi-reconfigure-raspi-firmware.service "${ROOT?}/etc/systemd/system/"
+      install -m 644 -o root -g root image-specs/rootfs/etc/systemd/system/rpi-reconfigure-raspi-firmware.service "${ROOT?}/etc/systemd/system/"
       mkdir -p "${ROOT?}/etc/systemd/system/multi-user.target.requires/"
       ln -s /etc/systemd/system/rpi-reconfigure-raspi-firmware.service "${ROOT?}/etc/systemd/system/multi-user.target.requires/rpi-reconfigure-raspi-firmware.service"
 
-      install -m 644 -o root -g root rootfs/etc/systemd/system/rpi-generate-ssh-host-keys.service "${ROOT?}/etc/systemd/system/"
+      install -m 644 -o root -g root image-specs/rootfs/etc/systemd/system/rpi-generate-ssh-host-keys.service "${ROOT?}/etc/systemd/system/"
       ln -s /etc/systemd/system/rpi-generate-ssh-host-keys.service "${ROOT?}/etc/systemd/system/multi-user.target.requires/rpi-generate-ssh-host-keys.service"
       rm -f "${ROOT?}"/etc/ssh/ssh_host_*_key*
 
