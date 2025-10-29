@@ -152,6 +152,7 @@
         state: restarted
         daemon_reload: true
         name: dendrite
+      when: not (is_vmdb2 | bool)
 
     - name: Download Matrix reverse proxy config for Lighttpd
       get_url:
@@ -173,15 +174,40 @@
         dest: /etc/lighttpd/conf-enabled/50-matrix-reverse-proxy.conf
         state: link
         force: true
-#
-#    - name: Start dendrite as user butter_user
-#      become: yes
-#      become_user: "{{ butter_user }}"
-#      shell: |
-#        nohup /home/{{ butter_user }}/dendrite/bin/dendrite \
-#          --config /home/{{ butter_user }}/dendrite/butterbox-dendrite.conf \
-#          -really-enable-open-registration \
-#          > /var/log/butter/dendrite-provision.log 2>&1 &
-#      args:
-#        chdir: "/home/{{ butter_user }}"
-#      when: is_vmdb2 | bool
+
+    - name: Start dendrite as user butter_user
+      become: yes
+      become_user: "{{ butter_user }}"
+      shell: |
+        nohup /home/{{ butter_user }}/dendrite/bin/dendrite \
+          --config /home/{{ butter_user }}/dendrite/butterbox-dendrite.conf \
+          -really-enable-open-registration \
+          > /var/log/dendrite/dendrite-provision.log 2>&1 &
+      args:
+        chdir: "/home/{{ butter_user }}"
+      when: is_vmdb2 | bool
+
+
+    - name: Wait for Dendrite client API to be available
+      wait_for:
+        host: "127.0.0.1"
+        port: 8008
+        delay: 3         # wait a few seconds before first check
+        timeout: 60      # give it up to a minute to start
+        state: started
+      when: is_vmdb2 | bool
+    
+    - name: Copy public room script
+      template:
+        src: templates/create_public_room.sh.j2
+        dest: /home/pi/create_public_room.sh
+        mode: '0755'
+  
+    - name: Run the create_public_room.sh script
+      command: /home/pi/create_public_room.sh
+      register: room_creation
+      ignore_errors: false 
+    
+    - name: Show room creation output
+      debug:
+        var: room_creation.stdout

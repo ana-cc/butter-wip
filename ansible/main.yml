@@ -4,17 +4,16 @@
     - "base"
     - "ap"
     - "matrix"
-
 - import_playbook: install-rasp-ap.yml
   tags: "ap"
   when:  ap_mode_supported | bool
-
 - import_playbook: deploy-butter-site.yml
   tags: 
     - "website"
     - "usb"
 - import_playbook: install-chat.yml
   tags: "matrix"
+- import_playbook: cleanup.yml
 - import_playbook: install-keanu-weblite.yml
   tags:
     - "matrix"

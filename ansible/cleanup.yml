@@ -1,0 +1,49 @@
+---
+- name: Cleanup
+  hosts: all
+  become: true
+  tasks:
+    - name: Print Dendrite process info for debugging
+      become: yes
+      ansible.builtin.shell: |
+        echo "=== Dendrite PIDs ==="
+        pgrep -u {{ butter_user }} -f dendrite || echo "No dendrite PIDs found"
+    
+        echo
+        echo "=== Full process tree of Dendrite ==="
+        for pid in $(pgrep -u {{ butter_user }} -f dendrite); do
+            echo "Process tree for PID $pid:"
+            pstree -p $pid || echo "pstree not available for PID $pid"
+            echo
+        done
+    
+        echo "=== Open files under VMDB mount ==="
+        lsof +D /tmp/tmpyu_8dsew || echo "No open files found"
+    
+        echo "=== Current working directories of processes in mount ==="
+        lsof +D /tmp/tmpyu_8dsew | awk '{print $2, $NF}' | sort | uniq
+      register: dendrite_debug
+      when: is_vmdb2 | bool
+
+    - name: Show debug output
+      debug:
+        msg: "{{ dendrite_debug.stdout_lines }}"
+      when: is_vmdb2 | bool
+
+    - name: Kill any running Dendrite process
+      become: yes
+      ansible.builtin.shell: |
+        pgrep -u {{ butter_user }} -f dendrite | xargs -r kill -9
+      register: dendrite_cleanup
+      changed_when: dendrite_cleanup.stdout != ""
+      when: is_vmdb2 | bool
+    
+    - name: Show cleanup output
+      ansible.builtin.debug:
+        msg: "{{ dendrite_cleanup.stdout_lines }}"
+      when: is_vmdb2 | bool
+
+    - name: Give processes time to exit
+      become: yes
+      shell: sleep 5
+      when: is_vmdb2 | bool

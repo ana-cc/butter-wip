@@ -1,0 +1,95 @@
+#!/usr/bin/env bash
+#
+# butterbox-setup.sh
+# Registers a Matrix user and creates a public room. Fails on any non-200 response.
+
+#set -e  # exit if any command fails
+
+MATRIX_HOMESERVER="http://localhost:8008"
+
+echo "Registering user {{ butter_name }}-admin..."
+
+
+USERNAME="{{ butter_name }}-admin"
+PASSWORD="{{ butter_name}}-admin"
+
+
+HTTP_RESPONSE=$(curl -s -w "HTTPSTATUS:%{http_code}" -X POST \
+  "${MATRIX_HOMESERVER}/_matrix/client/v3/register?kind=user" \
+  -H "Content-Type: application/json" \
+  -d "{
+    \"auth\": {
+      \"type\": \"m.login.dummy\"
+    },
+    \"username\": \"$USERNAME\",
+    \"password\": \"$PASSWORD\",
+    \"initial_device_display_name\": \"{{ butter_name }}\"
+  }")
+
+# Separate body and status
+HTTP_BODY=$(echo "$HTTP_RESPONSE" | sed -e 's/HTTPSTATUS\:.*//g')
+HTTP_STATUS=$(echo "$HTTP_RESPONSE" | tr -d '\n' | sed -e 's/.*HTTPSTATUS://')
+
+if [ "$HTTP_STATUS" -ne 200 ]; then
+  echo "❌ Registration failed with HTTP status $HTTP_STATUS"
+  echo "Response from server:"
+  echo "$HTTP_BODY"
+fi
+
+# Extract access_token using grep/sed
+ACCESS_TOKEN=$(echo "$HTTP_BODY" | grep -o '"access_token"[^,}]*' | sed 's/.*: *"//; s/"$//')
+
+if [ -z "$ACCESS_TOKEN" ]; then
+  echo "❌ No access token found in registration response."
+  echo "Response:"
+  echo "$HTTP_BODY"
+  exit 1
+fi
+
+echo "✅ Registration successful!"
+echo "Access Token: $ACCESS_TOKEN"
+
+# --- Create a room ---
+ROOM_ALIAS_NAME="public"
+ROOM_NAME="public"
+
+LANG_ARG={{ butter_language }}
+
+ROOM_TOPIC="This is a public, unencrypted room. To have a private conversation, create a new room."
+if [ "$LANG_ARG" = "es" ]; then
+  ROOM_TOPIC="Esta es una sala de chat pública y sin cifrar. Para tener una conversación privada, crea una nueva sala."
+fi
+
+echo "Creating public room '${ROOM_NAME}'..."
+
+ROOM_HTTP_RESPONSE=$(curl -s -w "HTTPSTATUS:%{http_code}" -X POST \
+  "${MATRIX_HOMESERVER}/_matrix/client/v3/createRoom" \
+  -H "Authorization: Bearer ${ACCESS_TOKEN}" \
+  -H "Content-Type: application/json" \
+  -d "{
+    \"visibility\": \"public\",
+    \"preset\": \"public_chat\",
+    \"room_alias_name\": \"${ROOM_ALIAS_NAME}\",
+    \"name\": \"${ROOM_NAME}\",
+    \"topic\": \"${ROOM_TOPIC}\"
+  }")
+
+ROOM_HTTP_BODY=$(echo "$ROOM_HTTP_RESPONSE" | sed -e 's/HTTPSTATUS\:.*//g')
+ROOM_HTTP_STATUS=$(echo "$ROOM_HTTP_RESPONSE" | tr -d '\n' | sed -e 's/.*HTTPSTATUS://')
+
+if [ "$ROOM_HTTP_STATUS" -ne 200 ]; then
+  SEARCH_STRING="already exists"
+  if echo "$HTTP_BODY" | grep -q "$SEARCH_STRING"; then
+      echo "Response from server:"
+      echo "$HTTP_BODY"
+      exit 0
+  fi
+  echo "❌ Room creation failed with HTTP status $ROOM_HTTP_STATUS"
+  echo "Response from server:"
+  echo "$ROOM_HTTP_BODY"
+  exit 1
+fi
+
+echo "✅ Public room created successfully!"
+echo "Response:"
+echo "$ROOM_HTTP_BODY"
